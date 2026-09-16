@@ -52,11 +52,6 @@ app.get('/api/scrape-now', async (req, res) => {
   }
 });
 
-// Fallback: serve index.html for all non-API routes (SPA routing)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
-});
-
 async function periodicScrape() {
   try {
     console.log(`[${new Date().toISOString()}] Running scheduled scrape...`);
