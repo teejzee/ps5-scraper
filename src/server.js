@@ -13,9 +13,15 @@ let lastScrapedTime = null;
 
 app.use(cors());
 app.use(express.json());
-// Serve static files from current directory (for Vercel deployment)
-// In dist/ folder: config.js, index.html are at root
-app.use(express.static(__dirname));
+
+// Serve static files
+// When running locally: serve from ../public
+// When running from dist/ (Vercel): serve from parent directory where config.js and index.html are
+const publicPath = process.env.NODE_ENV === 'production' 
+  ? path.join(__dirname, '..')  // In dist/src, go up to dist/
+  : path.join(__dirname, '../public');  // Local dev: go to public/
+
+app.use(express.static(publicPath));
 
 app.get('/api/availability', (req, res) => {
   res.json({
