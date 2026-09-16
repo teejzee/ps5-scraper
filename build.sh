@@ -20,7 +20,19 @@ mkdir -p dist
 cp -r public/* dist/
 
 # Generate config.js with the correct API URL
-cat > dist/config.js << EOF
+# For Vercel: use window.location.origin (current domain)
+# For localhost: use http://localhost:3000
+if [ "${VERCEL}" = "1" ] || [ "${API_URL}" = "window.location.origin" ]; then
+  cat > dist/config.js << EOF
+// API Configuration - Generated at build time for production
+window.API_CONFIG = {
+  BASE_URL: window.location.origin,
+  AVAILABILITY_ENDPOINT: '/api/availability',
+  SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
+};
+EOF
+else
+  cat > dist/config.js << EOF
 // API Configuration - Generated at build time for production
 window.API_CONFIG = {
   BASE_URL: '${API_URL}',
@@ -28,6 +40,7 @@ window.API_CONFIG = {
   SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
 };
 EOF
+fi
 
 # Copy backend files
 cp -r src dist/src
