@@ -14,32 +14,41 @@ let lastScrapedTime = null;
 app.use(cors());
 app.use(express.json());
 
-// Determine the public path
-const isDev = process.env.NODE_ENV !== 'production';
-const publicPath = isDev 
-  ? path.join(__dirname, '../public')      // Local: ../public
-  : path.join(__dirname, '..');             // Production: .. (dist root)
+// In Vercel, __dirname is the function directory
+// We need to look for static files relative to the actual file location
+// When deployed: /var/task/dist/src/server.js
+// Static files are at: /var/task/dist/
 
-console.log(`NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
-console.log(`__dirname: ${__dirname}`);
-console.log(`publicPath: ${publicPath}`);
-console.log(`index.html path: ${path.join(publicPath, 'index.html')}`);
-
-// Verify index.html exists
-const indexFile = path.join(publicPath, 'index.html');
 const fs = require('fs');
-if (fs.existsSync(indexFile)) {
-  console.log(`✅ index.html found at ${indexFile}`);
-} else {
-  console.error(`❌ index.html NOT found at ${indexFile}`);
-  // Try to list what files ARE there
-  try {
-    const files = fs.readdirSync(publicPath);
-    console.error(`Files in ${publicPath}:`, files);
-  } catch (e) {
-    console.error(`Can't read ${publicPath}:`, e.message);
+
+// Try multiple possible locations for index.html
+const possiblePaths = [
+  path.join(__dirname, '..'),                    // ../  (dist root)
+  path.join(__dirname, '../..'),                 // ../../ (root)
+  path.join(__dirname, '../../public'),          // ../../public (local dev from src)
+  process.cwd(),                                 // current working directory
+  '/var/task/dist',                              // Vercel specific
+];
+
+let publicPath = null;
+for (const p of possiblePaths) {
+  const indexPath = path.join(p, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    publicPath = p;
+    console.log(`✅ Found index.html at: ${p}`);
+    break;
   }
 }
+
+if (!publicPath) {
+  console.error('❌ Could not find index.html in any location!');
+  console.error('Tried:', possiblePaths);
+  console.error('Current working directory:', process.cwd());
+  console.error('__dirname:', __dirname);
+  publicPath = path.join(__dirname, '..');  // fallback
+}
+
+console.log(`Using publicPath: ${publicPath}`);
 
 // Serve static files
 app.use(express.static(publicPath));
@@ -75,9 +84,10 @@ app.get('/api/scrape-now', async (req, res) => {
 
 // Fallback: serve index.html for all non-API routes (SPA routing)
 app.get('*', (req, res) => {
+  const indexFile = path.join(publicPath, 'index.html');
   res.sendFile(indexFile, (err) => {
     if (err) {
-      console.error(`Error sending index.html: ${err.message}`);
+      console.error(`Error serving index.html from ${indexFile}: ${err.message}`);
       res.status(404).send('index.html not found');
     }
   });
