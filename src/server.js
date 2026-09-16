@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { scrapeAllUrls } from './scraper.js';
 import fs from 'fs';
+import nodemailer from 'nodemailer';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -11,9 +12,62 @@ const PORT = process.env.PORT || 3000;
 
 let lastResults = [];
 let lastScrapedTime = null;
+let emailedProducts = new Set(); // Track products we've already emailed about
 
-app.use(cors());
-app.use(express.json());
+// Setup email transporter
+let emailTransporter = null;
+
+function initializeEmailTransporter() {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
+    console.log('⚠️  Email credentials not configured. Email notifications disabled.');
+    return null;
+  }
+
+  try {
+    emailTransporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD
+      }
+    });
+    console.log('✅ Email transporter initialized');
+    return emailTransporter;
+  } catch (error) {
+    console.error('❌ Failed to initialize email transporter:', error.message);
+    return null;
+  }
+}
+
+async function sendEmailAlert(product) {
+  if (!emailTransporter) return;
+
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: 'thijs.zijp@gmail.com',
+      subject: `🎮 PS5 PRO AVAILABLE - ${product.name}!`,
+      html: `
+        <h2>🎮 PS5 PRO IS AVAILABLE!</h2>
+        <p><strong>Store:</strong> ${product.name}</p>
+        <p><strong>Price:</strong> €${product.price ? product.price.toFixed(2) : 'N/A'}</p>
+        <p><strong>Status:</strong> Available for purchase</p>
+        <p><strong>Time:</strong> ${new Date().toLocaleString('nl-NL')}</p>
+        <br>
+        <p><a href="${product.url}" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Visit Store</a></p>
+        <hr>
+        <p><small>This is an automated notification from PS5 Scraper</small></p>
+      `
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+    console.log(`✉️  Email sent to thijs.zijp@gmail.com for ${product.name}`);
+  } catch (error) {
+    console.error(`❌ Failed to send email for ${product.name}:`, error.message);
+  }
+}
+
+
 
 // In Vercel, __dirname is the function directory
 // We need to look for static files relative to the actual file location
@@ -55,8 +109,19 @@ app.get('/api/availability', (req, res) => {
   res.json({
     results: lastResults,
     lastScraped: lastScrapedTime,
-    updateInterval: 5 * 60 * 1000
+    updateInterval: 60 * 1000
   });
+});
+
+app.get('/api/cron/check-availability', async (req, res) => {
+  // Verify this is a legitimate Vercel cron call
+  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  console.log('🔄 Cron job triggered');
+  await periodicScrape();
+  res.json({ success: true, lastScraped: lastScrapedTime });
 });
 
 app.get('/api/scrape-now', async (req, res) => {
@@ -101,6 +166,15 @@ async function periodicScrape() {
     const available = results.filter(r => r.available && r.success);
     if (available.length > 0) {
       console.log(`✅ AVAILABLE: ${available.map(r => r.name).join(', ')}`);
+      
+      // Send email for newly available products
+      for (const product of available) {
+        const productKey = `${product.name}-${product.price}`;
+        if (!emailedProducts.has(productKey)) {
+          await sendEmailAlert(product);
+          emailedProducts.add(productKey);
+        }
+      }
     } else {
       console.log('❌ No availability found');
     }
@@ -111,13 +185,23 @@ async function periodicScrape() {
 
 async function startServer() {
   try {
-    // Run first scrape immediately
-    await periodicScrape();
+    // Initialize email transporter
+    initializeEmailTransporter();
 
-    // Schedule periodic scrapes every 1 minute
-    const SCRAPE_INTERVAL = 60 * 1000;
-    setInterval(periodicScrape, SCRAPE_INTERVAL);
-    console.log(`Scraping every 1 minute`);
+    // Only run periodic scrape if not on Vercel (for local development)
+    if (!process.env.VERCEL) {
+      // Run first scrape immediately
+      await periodicScrape();
+
+      // Schedule periodic scrapes every 1 minute
+      const SCRAPE_INTERVAL = 60 * 1000;
+      setInterval(periodicScrape, SCRAPE_INTERVAL);
+      console.log(`Scraping every 1 minute (local mode)`);
+    } else {
+      console.log('✅ Running on Vercel - use /api/cron/check-availability endpoint');
+      // Run once on startup to populate initial data
+      await periodicScrape();
+    }
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
