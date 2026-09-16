@@ -304,7 +304,7 @@
 
     function playNotificationSound() {
       try {
-        // Create audio context with user gesture handling
+        // Try Web Audio API first
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         const audioContext = new AudioContext();
         
@@ -316,8 +316,17 @@
         } else {
           playSoundWithContext(audioContext);
         }
+        
+        // Also vibrate on mobile as fallback
+        if (navigator.vibrate) {
+          navigator.vibrate([200, 100, 200, 100, 200]); // Vibrate pattern: beep-pause-beep-pause-beep
+        }
       } catch (e) {
         console.log('Could not play notification sound:', e);
+        // Fallback: try vibration only
+        if (navigator.vibrate) {
+          navigator.vibrate([300, 150, 300]);
+        }
       }
     }
 
