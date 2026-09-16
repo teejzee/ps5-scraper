@@ -1,12 +1,13 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "builds": [
-    {
-      "src": "dist/src/server.js",
-      "use": "@vercel/node"
+  "outputDirectory": "dist",
+  "env": {},
+  "functions": {
+    "dist/src/server.js": {
+      "runtime": "nodejs18.x"
     }
-  ],
+  },
   "routes": [
     {
       "src": "/api/(.*)",
