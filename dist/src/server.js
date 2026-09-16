@@ -14,13 +14,43 @@ let lastScrapedTime = null;
 app.use(cors());
 app.use(express.json());
 
-// Serve static files
-// When running locally: serve from ../public
-// When running from dist/ (Vercel): serve from parent directory where config.js and index.html are
-const publicPath = process.env.NODE_ENV === 'production' 
-  ? path.join(__dirname, '..')  // In dist/src, go up to dist/
-  : path.join(__dirname, '../public');  // Local dev: go to public/
+// In Vercel, __dirname is the function directory
+// We need to look for static files relative to the actual file location
+// When deployed: /var/task/dist/src/server.js
+// Static files are at: /var/task/dist/
 
+const fs = require('fs');
+
+// Try multiple possible locations for index.html
+const possiblePaths = [
+  path.join(__dirname, '..'),                    // ../  (dist root)
+  path.join(__dirname, '../..'),                 // ../../ (root)
+  path.join(__dirname, '../../public'),          // ../../public (local dev from src)
+  process.cwd(),                                 // current working directory
+  '/var/task/dist',                              // Vercel specific
+];
+
+let publicPath = null;
+for (const p of possiblePaths) {
+  const indexPath = path.join(p, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    publicPath = p;
+    console.log(`✅ Found index.html at: ${p}`);
+    break;
+  }
+}
+
+if (!publicPath) {
+  console.error('❌ Could not find index.html in any location!');
+  console.error('Tried:', possiblePaths);
+  console.error('Current working directory:', process.cwd());
+  console.error('__dirname:', __dirname);
+  publicPath = path.join(__dirname, '..');  // fallback
+}
+
+console.log(`Using publicPath: ${publicPath}`);
+
+// Serve static files
 app.use(express.static(publicPath));
 
 app.get('/api/availability', (req, res) => {
@@ -50,6 +80,17 @@ app.get('/api/scrape-now', async (req, res) => {
       error: error.message
     });
   }
+});
+
+// Fallback: serve index.html for all non-API routes (SPA routing)
+app.get('*', (req, res) => {
+  const indexFile = path.join(publicPath, 'index.html');
+  res.sendFile(indexFile, (err) => {
+    if (err) {
+      console.error(`Error serving index.html from ${indexFile}: ${err.message}`);
+      res.status(404).send('index.html not found');
+    }
+  });
 });
 
 async function periodicScrape() {
