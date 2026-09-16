@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { scrapeAllUrls } from './scraper.js';
+import fs from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -19,15 +20,12 @@ app.use(express.json());
 // When deployed: /var/task/dist/src/server.js
 // Static files are at: /var/task/dist/
 
-const fs = require('fs');
-
 // Try multiple possible locations for index.html
 const possiblePaths = [
-  path.join(__dirname, '..'),                    // ../  (dist root)
-  path.join(__dirname, '../..'),                 // ../../ (root)
-  path.join(__dirname, '../../public'),          // ../../public (local dev from src)
-  process.cwd(),                                 // current working directory
-  '/var/task/dist',                              // Vercel specific
+  path.join(__dirname, '../public'),         // ../public (local dev: src -> public)
+  path.join(__dirname, '..'),                // .. (dist root when running from dist/src)
+  process.cwd(),                             // current working directory
+  '/var/task/dist',                          // Vercel specific
 ];
 
 let publicPath = null;
