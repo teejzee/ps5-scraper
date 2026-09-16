@@ -20,9 +20,10 @@ mkdir -p dist
 cp -r public/* dist/
 
 # Generate config.js with the correct API URL
-# For Vercel: use window.location.origin (current domain)
-# For localhost: use http://localhost:3000
-if [ "${VERCEL}" = "1" ] || [ "${API_URL}" = "window.location.origin" ]; then
+# NODE_ENV is automatically set by Vercel to "production"
+# For production: use window.location.origin (current domain)
+# For development: use http://localhost:3000
+if [ "${NODE_ENV}" = "production" ]; then
   cat > dist/config.js << EOF
 // API Configuration - Generated at build time for production
 window.API_CONFIG = {
@@ -31,15 +32,17 @@ window.API_CONFIG = {
   SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
 };
 EOF
+  echo "   📍 Production build: using window.location.origin"
 else
   cat > dist/config.js << EOF
-// API Configuration - Generated at build time for production
+// API Configuration - Generated at build time for development
 window.API_CONFIG = {
   BASE_URL: '${API_URL}',
   AVAILABILITY_ENDPOINT: '/api/availability',
   SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
 };
 EOF
+  echo "   📍 Development build: using ${API_URL}"
 fi
 
 # Copy backend files

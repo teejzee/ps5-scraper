@@ -1,4 +1,4 @@
-// API Configuration - Generated at build time for production
+// API Configuration - Generated at build time for development
 window.API_CONFIG = {
   BASE_URL: 'http://localhost:3000',
   AVAILABILITY_ENDPOINT: '/api/availability',
