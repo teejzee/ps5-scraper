@@ -14,8 +14,8 @@
       "dest": "dist/src/server.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "dist/index.html"
+      "src": "/.*",
+      "dest": "dist/src/server.js"
     }
   ]
 }
