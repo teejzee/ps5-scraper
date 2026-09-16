@@ -1,6 +1,6 @@
-// API Configuration - Generated at build time for Vercel production
+// API Configuration - Development configuration
 window.API_CONFIG = {
-  BASE_URL: 'https://ps5-scraper-abc123.vercel.app',
+  BASE_URL: 'http://localhost:3000',
   AVAILABILITY_ENDPOINT: '/api/availability',
   SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
 };

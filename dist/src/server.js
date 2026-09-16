@@ -13,7 +13,9 @@ let lastScrapedTime = null;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '../public')));
+// Serve static files from current directory (for Vercel deployment)
+// In dist/ folder: config.js, index.html are at root
+app.use(express.static(__dirname));
 
 app.get('/api/availability', (req, res) => {
   res.json({

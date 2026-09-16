@@ -20,36 +20,24 @@ mkdir -p dist
 cp -r public/* dist/
 
 # Generate config.js with the correct API URL
-# Vercel automatically provides VERCEL_URL env variable
-# In production (Vercel): use VERCEL_URL
-# In development: use http://localhost:3000
-if [ -n "${VERCEL_URL}" ]; then
-  # Vercel deployment: use the Vercel URL
-  FINAL_URL="https://${VERCEL_URL}"
+# For production (Vercel): use window.location.origin (always works, URL changes don't matter)
+# For development: use http://localhost:3000
+if [ "${NODE_ENV}" = "production" ] || [ -n "${VERCEL}" ]; then
+  # Production: use window.location.origin (dynamically resolves to current domain)
   cat > dist/config.js << EOF
-// API Configuration - Generated at build time for Vercel production
+// API Configuration - Dynamic production configuration
+// Uses window.location.origin so it works with any Vercel deployment URL
 window.API_CONFIG = {
-  BASE_URL: '${FINAL_URL}',
+  BASE_URL: window.location.origin,
   AVAILABILITY_ENDPOINT: '/api/availability',
   SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
 };
 EOF
-  echo "   📍 Vercel production: ${FINAL_URL}"
-elif [ -n "${REACT_APP_API_URL}" ]; then
-  # Custom environment variable provided
-  cat > dist/config.js << EOF
-// API Configuration - Generated at build time
-window.API_CONFIG = {
-  BASE_URL: '${REACT_APP_API_URL}',
-  AVAILABILITY_ENDPOINT: '/api/availability',
-  SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
-};
-EOF
-  echo "   📍 Using REACT_APP_API_URL: ${REACT_APP_API_URL}"
+  echo "   📍 Production: using window.location.origin (dynamic)"
 else
   # Development: use localhost
   cat > dist/config.js << EOF
-// API Configuration - Generated at build time for development
+// API Configuration - Development configuration
 window.API_CONFIG = {
   BASE_URL: 'http://localhost:3000',
   AVAILABILITY_ENDPOINT: '/api/availability',
