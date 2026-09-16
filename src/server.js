@@ -14,13 +14,16 @@ let lastScrapedTime = null;
 app.use(cors());
 app.use(express.json());
 
-// Serve static files
-// When running locally: serve from ../public
-// When running from dist/ (Vercel): serve from parent directory where config.js and index.html are
-const publicPath = process.env.NODE_ENV === 'production' 
-  ? path.join(__dirname, '..')  // In dist/src, go up to dist/
-  : path.join(__dirname, '../public');  // Local dev: go to public/
+// Determine the public path
+const isDev = process.env.NODE_ENV !== 'production';
+const publicPath = isDev 
+  ? path.join(__dirname, '../public')      // Local: ../public
+  : path.join(__dirname, '..');             // Production: .. (dist root)
 
+console.log(`NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
+console.log(`Serving static files from: ${publicPath}`);
+
+// Serve static files
 app.use(express.static(publicPath));
 
 app.get('/api/availability', (req, res) => {
@@ -54,7 +57,14 @@ app.get('/api/scrape-now', async (req, res) => {
 
 // Fallback: serve index.html for all non-API routes (SPA routing)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(publicPath, 'index.html'));
+  const indexPath = path.join(publicPath, 'index.html');
+  console.log(`[SPA] Serving ${req.path} -> ${indexPath}`);
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error(`Error sending index.html: ${err.message}`);
+      res.status(404).send('index.html not found');
+    }
+  });
 });
 
 async function periodicScrape() {
