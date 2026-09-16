@@ -5,11 +5,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "dist/src/server.js"
+      "dest": "src/server.js"
     },
     {
       "src": "/.*",
-      "dest": "dist/src/server.js"
+      "dest": "src/server.js"
     }
   ]
 }
