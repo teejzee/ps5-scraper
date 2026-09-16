@@ -1,8 +1,8 @@
 // API Configuration
-// This file is generated at build time with the correct API URL
-// Default: local development server
+// For full-stack deployment on Vercel, use current domain
+// Backend and frontend are on same domain
 window.API_CONFIG = {
-  BASE_URL: process.env.REACT_APP_API_URL || 'http://localhost:3000',
+  BASE_URL: window.location.origin,
   AVAILABILITY_ENDPOINT: '/api/availability',
   SCRAPE_NOW_ENDPOINT: '/api/scrape-now'
 };
