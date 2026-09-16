@@ -21,7 +21,25 @@ const publicPath = isDev
   : path.join(__dirname, '..');             // Production: .. (dist root)
 
 console.log(`NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
-console.log(`Serving static files from: ${publicPath}`);
+console.log(`__dirname: ${__dirname}`);
+console.log(`publicPath: ${publicPath}`);
+console.log(`index.html path: ${path.join(publicPath, 'index.html')}`);
+
+// Verify index.html exists
+const indexFile = path.join(publicPath, 'index.html');
+const fs = require('fs');
+if (fs.existsSync(indexFile)) {
+  console.log(`✅ index.html found at ${indexFile}`);
+} else {
+  console.error(`❌ index.html NOT found at ${indexFile}`);
+  // Try to list what files ARE there
+  try {
+    const files = fs.readdirSync(publicPath);
+    console.error(`Files in ${publicPath}:`, files);
+  } catch (e) {
+    console.error(`Can't read ${publicPath}:`, e.message);
+  }
+}
 
 // Serve static files
 app.use(express.static(publicPath));
@@ -57,9 +75,7 @@ app.get('/api/scrape-now', async (req, res) => {
 
 // Fallback: serve index.html for all non-API routes (SPA routing)
 app.get('*', (req, res) => {
-  const indexPath = path.join(publicPath, 'index.html');
-  console.log(`[SPA] Serving ${req.path} -> ${indexPath}`);
-  res.sendFile(indexPath, (err) => {
+  res.sendFile(indexFile, (err) => {
     if (err) {
       console.error(`Error sending index.html: ${err.message}`);
       res.status(404).send('index.html not found');
