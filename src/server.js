@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { scrapeAllUrls } from './scraper.js';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -16,6 +17,25 @@ let emailedProducts = new Set(); // Track products we've already emailed about
 
 // Setup email transporter
 let emailTransporter = null;
+
+// Setup Resend
+let resend = null;
+
+function initializeResend() {
+  if (!process.env.RESEND_API_KEY) {
+    console.log('⚠️  Resend API key not configured. Resend email disabled.');
+    return null;
+  }
+
+  try {
+    resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend initialized');
+    return resend;
+  } catch (error) {
+    console.error('❌ Failed to initialize Resend:', error.message);
+    return null;
+  }
+}
 
 function initializeEmailTransporter() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
@@ -67,7 +87,31 @@ async function sendEmailAlert(product) {
   }
 }
 
+async function sendEmailAlertResend(product) {
+  if (!resend) return;
 
+  try {
+    const response = await resend.emails.send({
+      from: 'PS5 Scraper <noreply@resend.dev>',
+      to: 'thijs.zijp@gmail.com',
+      subject: `🎮 PS5 PRO AVAILABLE - ${product.name}!`,
+      html: `
+        <h2>🎮 PS5 PRO IS AVAILABLE!</h2>
+        <p><strong>Store:</strong> ${product.name}</p>
+        <p><strong>Price:</strong> €${product.price ? product.price.toFixed(2) : 'N/A'}</p>
+        <p><strong>Status:</strong> Available for purchase</p>
+        <p><strong>Time:</strong> ${new Date().toLocaleString('nl-NL')}</p>
+        <br>
+        <p><a href="${product.url}" style="background: #667eea; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Visit Store</a></p>
+        <hr>
+        <p><small>This is an automated notification from PS5 Scraper</small></p>
+      `
+    });
+    console.log(`✉️  Resend email sent to thijs.zijp@gmail.com for ${product.name}:`, response.id);
+  } catch (error) {
+    console.error(`❌ Failed to send Resend email for ${product.name}:`, error.message);
+  }
+}
 
 // In Vercel, __dirname is the function directory
 // We need to look for static files relative to the actual file location
@@ -145,6 +189,86 @@ app.get('/api/scrape-now', async (req, res) => {
   }
 });
 
+app.get('/api/check-ps5', async (req, res) => {
+  try {
+    console.log('🎮 Checking PS5 availability and sending email with Resend...');
+    const results = await scrapeAllUrls();
+    
+    // Check if any PS5 is available
+    const availableProducts = results.filter(r => r.available && r.success && r.price && r.price < 1000);
+    
+    if (availableProducts.length > 0) {
+      console.log(`✅ Found ${availableProducts.length} available PS5 Pro(s)`);
+      
+      // Send email for each available product using Resend
+      for (const product of availableProducts) {
+        await sendEmailAlertResend(product);
+      }
+      
+      res.json({
+        success: true,
+        available: true,
+        products: availableProducts,
+        message: `Email sent to thijs.zijp@gmail.com for ${availableProducts.length} available product(s)`
+      });
+    } else {
+      console.log('❌ No PS5 Pro available');
+      res.json({
+        success: true,
+        available: false,
+        products: [],
+        message: 'No PS5 Pro available at this moment'
+      });
+    }
+  } catch (error) {
+    console.error('Error checking PS5:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.get('/api/test-email', async (req, res) => {
+  try {
+    console.log('📧 Testing email functionality with Resend...');
+    
+    if (!resend) {
+      return res.status(500).json({
+        success: false,
+        error: 'Resend not initialized. RESEND_API_KEY not configured.'
+      });
+    }
+
+    // Create a test product
+    const testProduct = {
+      name: 'TEST - PlayStation Direct NL',
+      url: 'https://direct.playstation.com/nl-nl/',
+      price: 799.99,
+      maxPrice: 1000,
+      available: true,
+      success: true,
+      lastChecked: new Date().toISOString()
+    };
+
+    // Send test email
+    await sendEmailAlertResend(testProduct);
+
+    res.json({
+      success: true,
+      message: 'Test email sent to thijs.zijp@gmail.com',
+      testProduct: testProduct,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Fallback: serve index.html for all non-API routes (SPA routing)
 app.get('*', (req, res) => {
   const indexFile = path.join(publicPath, 'index.html');
@@ -187,6 +311,9 @@ async function startServer() {
   try {
     // Initialize email transporter
     initializeEmailTransporter();
+
+    // Initialize Resend
+    initializeResend();
 
     // Only run periodic scrape if not on Vercel (for local development)
     if (!process.env.VERCEL) {
