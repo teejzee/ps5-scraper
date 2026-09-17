@@ -258,9 +258,7 @@ app.get('/api/test-email', async (req, res) => {
   }
 });
 
-// ========== STATIC FILES & SPA FALLBACK ==========
-
-app.use(express.static(publicPath));
+// ========== SPA FALLBACK (ONLY for non-API routes) ==========
 
 app.get('*', (req, res) => {
   const indexFile = path.join(publicPath, 'index.html');

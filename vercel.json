@@ -7,6 +7,10 @@
       "dest": "/dist/src/server.js"
     },
     {
+      "src": "/(?!api).*\\.(js|css|png|jpg|jpeg|svg|gif|ico)$",
+      "dest": "/dist/public/$0"
+    },
+    {
       "src": "/(.*)",
       "dest": "/dist/src/server.js"
     }
