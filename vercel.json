@@ -1,14 +1,14 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "dist/src/server.js"
+      "source": "/api/(.*)",
+      "destination": "/dist/src/server.js"
     },
     {
-      "src": "/.*",
-      "dest": "dist/src/server.js"
+      "source": "/(.*)",
+      "destination": "/dist/src/server.js"
     }
   ],
   "crons": [
