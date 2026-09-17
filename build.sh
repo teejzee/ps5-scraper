@@ -2,11 +2,7 @@
 
 # Production build script
 # Creates a complete dist/ folder with backend + frontend ready for deployment
-# Usage: npm run build (for localhost) or npm run build:production (for production API)
 
-# Get API URL from environment variable
-# For production on Vercel: dist will use current domain (window.location.origin)
-# For localhost development: dist will use http://localhost:3000
 API_URL="${REACT_APP_API_URL:-http://localhost:3000}"
 
 echo "🔨 Building for production..."
@@ -15,18 +11,14 @@ echo "📍 API URL: ${API_URL}"
 # Clean and create dist directory
 rm -rf dist
 mkdir -p dist
+mkdir -p dist/public
 
-# Copy frontend (public) files
-cp -r public/* dist/
+# Copy frontend (public) files to dist/public (NOT root)
+cp -r public/* dist/public/
 
-# Generate config.js with the correct API URL
-# For production (Vercel): use window.location.origin (always works, URL changes don't matter)
-# For development: use http://localhost:3000
+# Generate config.js in dist/public
 if [ "${NODE_ENV}" = "production" ] || [ -n "${VERCEL}" ]; then
-  # Production: use window.location.origin (dynamically resolves to current domain)
-  cat > dist/config.js << EOF
-// API Configuration - Dynamic production configuration
-// Uses window.location.origin so it works with any Vercel deployment URL
+  cat > dist/public/config.js << EOF
 window.API_CONFIG = {
   BASE_URL: window.location.origin,
   AVAILABILITY_ENDPOINT: '/api/availability',
@@ -35,9 +27,7 @@ window.API_CONFIG = {
 EOF
   echo "   📍 Production: using window.location.origin (dynamic)"
 else
-  # Development: use localhost
-  cat > dist/config.js << EOF
-// API Configuration - Development configuration
+  cat > dist/public/config.js << EOF
 window.API_CONFIG = {
   BASE_URL: 'http://localhost:3000',
   AVAILABILITY_ENDPOINT: '/api/availability',
@@ -64,7 +54,6 @@ PORT=3000
 EOF
 fi
 
-# Create a simple README for the dist folder
 cat > dist/README.md << EOF
 # PS5 Scraper - Production Build
 
@@ -105,4 +94,3 @@ echo "   ✓ Package files"
 echo "   ✓ Deployment config (vercel.json)"
 echo ""
 echo "🚀 Ready to deploy!"
-

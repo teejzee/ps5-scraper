@@ -7,7 +7,7 @@
       "dest": "dist/src/server.js"
     },
     {
-      "src": ".*",
+      "src": "/.*",
       "dest": "dist/src/server.js"
     }
   ],

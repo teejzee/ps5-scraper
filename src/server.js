@@ -112,9 +112,10 @@ async function sendEmailAlertResend(product) {
 
 const possiblePaths = [
   path.join(__dirname, '../public'),
+  path.join(__dirname, '../../public'),
   path.join(__dirname, '..'),
   process.cwd(),
-  '/var/task/dist',
+  '/var/task/dist/public',
 ];
 
 let publicPath = null;
