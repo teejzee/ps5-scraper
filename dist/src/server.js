@@ -260,7 +260,7 @@ app.get('/api/test-email', async (req, res) => {
 
 // ========== SPA FALLBACK (ONLY for non-API routes) ==========
 
-app.get('*', (req, res) => {
+app.get(/^(?!\/api\/).*/, (req, res) => {
   const indexFile = path.join(publicPath, 'index.html');
   res.sendFile(indexFile, (err) => {
     if (err) {
