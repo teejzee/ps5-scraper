@@ -13,29 +13,10 @@ const PORT = process.env.PORT || 3000;
 
 let lastResults = [];
 let lastScrapedTime = null;
-let emailedProducts = new Set(); // Track products we've already emailed about
+let emailedProducts = new Set();
 
-// Setup email transporter
 let emailTransporter = null;
-
-// Setup Resend
 let resend = null;
-
-function initializeResend() {
-  if (!process.env.RESEND_API_KEY) {
-    console.log('⚠️  Resend API key not configured. Resend email disabled.');
-    return null;
-  }
-
-  try {
-    resend = new Resend(process.env.RESEND_API_KEY);
-    console.log('✅ Resend initialized');
-    return resend;
-  } catch (error) {
-    console.error('❌ Failed to initialize Resend:', error.message);
-    return null;
-  }
-}
 
 function initializeEmailTransporter() {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
@@ -55,6 +36,22 @@ function initializeEmailTransporter() {
     return emailTransporter;
   } catch (error) {
     console.error('❌ Failed to initialize email transporter:', error.message);
+    return null;
+  }
+}
+
+function initializeResend() {
+  if (!process.env.RESEND_API_KEY) {
+    console.log('⚠️  Resend API key not configured. Resend email disabled.');
+    return null;
+  }
+
+  try {
+    resend = new Resend(process.env.RESEND_API_KEY);
+    console.log('✅ Resend initialized');
+    return resend;
+  } catch (error) {
+    console.error('❌ Failed to initialize Resend:', error.message);
     return null;
   }
 }
@@ -113,17 +110,11 @@ async function sendEmailAlertResend(product) {
   }
 }
 
-// In Vercel, __dirname is the function directory
-// We need to look for static files relative to the actual file location
-// When deployed: /var/task/dist/src/server.js
-// Static files are at: /var/task/dist/
-
-// Try multiple possible locations for index.html
 const possiblePaths = [
-  path.join(__dirname, '../public'),         // ../public (local dev: src -> public)
-  path.join(__dirname, '..'),                // .. (dist root when running from dist/src)
-  process.cwd(),                             // current working directory
-  '/var/task/dist',                          // Vercel specific
+  path.join(__dirname, '../public'),
+  path.join(__dirname, '..'),
+  process.cwd(),
+  '/var/task/dist',
 ];
 
 let publicPath = null;
@@ -141,10 +132,15 @@ if (!publicPath) {
   console.error('Tried:', possiblePaths);
   console.error('Current working directory:', process.cwd());
   console.error('__dirname:', __dirname);
-  publicPath = path.join(__dirname, '..');  // fallback
+  publicPath = path.join(__dirname, '..');
 }
 
 console.log(`Using publicPath: ${publicPath}`);
+
+app.use(cors());
+app.use(express.json());
+
+// ========== API ROUTES ==========
 
 app.get('/api/availability', (req, res) => {
   res.json({
@@ -155,8 +151,8 @@ app.get('/api/availability', (req, res) => {
 });
 
 app.get('/api/cron/check-availability', async (req, res) => {
-  // Verify this is a legitimate Vercel cron call
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET;
+  if (req.headers.authorization !== `Bearer ${secret}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
@@ -191,13 +187,11 @@ app.get('/api/check-ps5', async (req, res) => {
     console.log('🎮 Checking PS5 availability and sending email with Resend...');
     const results = await scrapeAllUrls();
     
-    // Check if any PS5 is available
     const availableProducts = results.filter(r => r.available && r.success && r.price && r.price < 1000);
     
     if (availableProducts.length > 0) {
       console.log(`✅ Found ${availableProducts.length} available PS5 Pro(s)`);
       
-      // Send email for each available product using Resend
       for (const product of availableProducts) {
         await sendEmailAlertResend(product);
       }
@@ -237,7 +231,6 @@ app.get('/api/test-email', async (req, res) => {
       });
     }
 
-    // Create a test product
     const testProduct = {
       name: 'TEST - PlayStation Direct NL',
       url: 'https://direct.playstation.com/nl-nl/',
@@ -248,7 +241,6 @@ app.get('/api/test-email', async (req, res) => {
       lastChecked: new Date().toISOString()
     };
 
-    // Send test email
     await sendEmailAlertResend(testProduct);
 
     res.json({
@@ -266,10 +258,10 @@ app.get('/api/test-email', async (req, res) => {
   }
 });
 
-// Serve static files AFTER API routes (so API routes take priority)
+// ========== STATIC FILES & SPA FALLBACK ==========
+
 app.use(express.static(publicPath));
 
-// Fallback: serve index.html for all non-API routes (SPA routing)
 app.get('*', (req, res) => {
   const indexFile = path.join(publicPath, 'index.html');
   res.sendFile(indexFile, (err) => {
@@ -279,6 +271,8 @@ app.get('*', (req, res) => {
     }
   });
 });
+
+// ========== PERIODIC SCRAPE ==========
 
 async function periodicScrape() {
   try {
@@ -291,7 +285,6 @@ async function periodicScrape() {
     if (available.length > 0) {
       console.log(`✅ AVAILABLE: ${available.map(r => r.name).join(', ')}`);
       
-      // Send email for newly available products
       for (const product of available) {
         const productKey = `${product.name}-${product.price}`;
         if (!emailedProducts.has(productKey)) {
@@ -309,24 +302,16 @@ async function periodicScrape() {
 
 async function startServer() {
   try {
-    // Initialize email transporter
     initializeEmailTransporter();
-
-    // Initialize Resend
     initializeResend();
 
-    // Only run periodic scrape if not on Vercel (for local development)
     if (!process.env.VERCEL) {
-      // Run first scrape immediately
       await periodicScrape();
-
-      // Schedule periodic scrapes every 1 minute
       const SCRAPE_INTERVAL = 60 * 1000;
       setInterval(periodicScrape, SCRAPE_INTERVAL);
       console.log(`Scraping every 1 minute (local mode)`);
     } else {
       console.log('✅ Running on Vercel - use /api/cron/check-availability endpoint');
-      // Run once on startup to populate initial data
       await periodicScrape();
     }
 
