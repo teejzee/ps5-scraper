@@ -146,9 +146,6 @@ if (!publicPath) {
 
 console.log(`Using publicPath: ${publicPath}`);
 
-// Serve static files
-app.use(express.static(publicPath));
-
 app.get('/api/availability', (req, res) => {
   res.json({
     results: lastResults,
@@ -268,6 +265,9 @@ app.get('/api/test-email', async (req, res) => {
     });
   }
 });
+
+// Serve static files AFTER API routes (so API routes take priority)
+app.use(express.static(publicPath));
 
 // Fallback: serve index.html for all non-API routes (SPA routing)
 app.get('*', (req, res) => {
